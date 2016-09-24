@@ -91,6 +91,12 @@ class RtmBot(object):
             for plugin in self.bot_plugins:
                 plugin.register_jobs()
                 plugin.do(function_name, data)
+        elif "text" in data:
+            function_name = "process_non_type_text"
+            self._dbg("got {}".format(function_name))
+            for plugin in self.bot_plugins:
+                plugin.register_jobs()
+                plugin.do(function_name, data)
 
     def output(self):
         for plugin in self.bot_plugins:
