@@ -1,4 +1,3 @@
-#FIXME: Please clean me up. I am so very, very messy.
 from __future__ import unicode_literals
 from client import slack_client as sc
 
@@ -10,38 +9,30 @@ outputs = []
 USAGE = """```Usage: !roll [diceroll]
 ex: !roll 3d6
     !roll 2d4-2
-    !roll 10d4+10```"""
+    !roll 10d4+1d6-1d8+2```"""
 
 def roll(input_dice):
-    r = re.match('^([bw])?([0-9]+)\s*d\s*([0-9]+)\s*([-+\/*x])?\s*([0-9]+)?\s*$', input_dice)
-    try:
-        dice  = int(r.group(2))
-        sides = int(r.group(3))
-    except AttributeError:
-        return "Unknown dice input: %s\n%s" % (input_dice, USAGE)
-    try:
-        mod_type = r.group(4)
-        mod      = int(r.group(5))
-    except AttributeError:
-        mod_type = ""
-        mod = ""
-    except TypeError:
-        mod_type = ""
-        mod = ""
+    r = re.match('^([bw])?([0-9]+)\s*d\s*([0-9]+)$', input_dice)
+    dice  = int(r.group(2))
+    sides = int(r.group(3))
     bestworst = r.group(1)
     if bestworst:
-        (r1, r1s) = _roll(dice, sides, mod_type, mod)
-        (r2, r2s) = _roll(dice, sides, mod_type, mod)
+        (r1, r1s) = _roll(dice, sides)
+        (r2, r2s) = _roll(dice, sides)
         if bestworst == "b":
-            result = r1s if r1 > r2 else r2s
-            return "b%s" % (result,)
+            if r1 > r2:
+                return (r1, "b%s" % (r1s,))
+            else:
+                return (r2, "b%s" % (r2s,))
         else:
-            result = r1s if r1 < r2 else r2s
-            return "w%s" % (result,)
+            if r1 < r2:
+                return (r1, "w%s" % (r1s,))
+            else:
+                return (r2, "w%s" % (r2s,))
     else:
-        return _roll(dice, sides, mod_type, mod)
+        return _roll(dice, sides)
 
-def _roll(dice, sides, mod_type, mod):
+def _roll(dice, sides):
     result = 0
     rolls = []
     old_dice = dice
@@ -51,23 +42,30 @@ def _roll(dice, sides, mod_type, mod):
         result += dice_roll
         dice -= 1
 
-    if mod_type == '+':
-        result += mod
-    if mod_type == '*' or mod_type == 'x':
-        result *= mod
-    if mod_type == '/':
-        result /= mod
-
-    result_str = "%dd%d%s%s: (%s)%s%s = %d" % (old_dice, sides, mod_type, mod, '+'.join(str(x) for x in rolls), mod_type, mod, result)
+    result_str = "%dd%d: (%s) = %d" % (old_dice, sides, '+'.join(str(x) for x in rolls), result)
 
     return (result, result_str)
 
 def do_rolls(raw):
-    test = re.match('^([bw])?([0-9]+)\s*d\s*([0-9]+)\s*([-+\/*x])?\s*([0-9]+)?\s*$', raw)
-    regex = re.finditer('([+-])?(\d+d\d+)', raw)
+    test = re.match("""
+        ^
+            (
+                \s*([+-])?\s*
+                \s*([bw])?\s*
+                \s*(\d+d\d+)\s*
+            )+\s*
+            (
+                \s*([-+\/*x])?
+                \s*([0-9]+)?\s*
+            )?
+        $""", raw, re.VERBOSE)
+    regex = re.finditer('([+-])?([bw]?\d+d\d+)', raw)
     rolls = []
     result = 0
     result_str = ""
+
+    if test is None:
+        return (None, "Unknown roll: %s\n%s" % (raw, USAGE), None)
 
     for x in regex:
         arith = x.group(1) if x.group(1) is not None else '+'
@@ -81,6 +79,8 @@ def do_rolls(raw):
             result -= value
         if result_str == "":
             result_str = "(%s)" % (string,)
+            if y[0] == '-':
+                result_str = "-%s" % (result_str,)
         else:
             result_str += " %s (%s)" % (y[0], string)
 
@@ -98,7 +98,7 @@ def do_rolls(raw):
     except AttributeError:
         pass
 
-    result_str = "*%d* = %s" % (result, result_str)
+    result_str = "%s = *%d*" % (result_str, result)
     return (result, result_str)
 
 def process_message(data):
@@ -107,8 +107,5 @@ def process_message(data):
     users = {x["id"]: x["name"] for x in sc.api_call("users.list")["members"]}
 
     r = re.match('^(.*)?!roll\s*(.*?)$', text, re.IGNORECASE)
-    try:
-        result = "%s: %s" % (users[data["user"]], do_rolls( r.group(2) )[1] )
-        outputs.append([data["channel"], result])
-    except AttributeError:
-        return
+    result = "%s: %s" % (users[data["user"]], do_rolls( r.group(2) )[1] )
+    outputs.append([data["channel"], result])
