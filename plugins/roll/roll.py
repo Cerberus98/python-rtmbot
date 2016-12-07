@@ -19,16 +19,22 @@ def roll(input_dice):
     if bestworst:
         (r1, r1s) = _roll(dice, sides)
         (r2, r2s) = _roll(dice, sides)
+        (val, s) = (None, None)
         if bestworst == "b":
             if r1 > r2:
-                return (r1, "b%s" % (r1s,))
+                val = r1
+                s = "(%s) > ~(%s)~" % (r1s, r2s)
             else:
-                return (r2, "b%s" % (r2s,))
+                val = r2
+                s = "(%s) > ~(%s)~" % (r2s, r1s)
         else:
             if r1 < r2:
-                return (r1, "w%s" % (r1s,))
+                val = r1
+                s = "(%s) < ~(%s)~" % (r1s, r2s)
             else:
-                return (r2, "w%s" % (r2s,))
+                val = r2
+                s = "(%s) < ~(%s)~" % (r2s, r1s)
+        return (val, s)
     else:
         return _roll(dice, sides)
 
